@@ -134,4 +134,7 @@ We kindly recommend to cite [our paper](https://ieeexplore.ieee.org/document/113
 - 2026-01-04 21:51
   - release ROS2 version
 
+- 2026-06-07
+ - [Important revisions]: Fixed some known errors and improved algorithm accuracy!
+ 
 </details>

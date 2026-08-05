@@ -269,13 +269,13 @@ bool SuperLIOReLoc::kf_init(){
 
 
 void SuperLIOReLoc::UpdateMap() {
-  if(g_update_map){
-    static int __update_delay = 100;
-    if(__update_delay > 0){
-      __update_delay--;
-      std::cout << "Update map Delay: " << 100 - __update_delay << " %" << std::endl;
-      return;
-    }
+  if(!g_update_map) return;
+  
+  static int __update_delay = 100;
+  if(__update_delay > 0){
+    __update_delay--;
+    std::cout << "Update map Delay: " << 100 - __update_delay << " %" << std::endl;
+    return;
   }
 
   const size_t ptsize = ds_undistort_->size();
