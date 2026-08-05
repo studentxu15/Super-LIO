@@ -408,8 +408,10 @@ void ROSWrapper::imuHandler(const sensor_msgs::msg::Imu::SharedPtr msg){
 
     odom_imu.header.stamp = msg->header.stamp;
     odom_robo.header.stamp = msg->header.stamp;
-    odom_imu.header.frame_id = "world";
-    odom_robo.header.frame_id = "world";
+    odom_imu.header.frame_id = "odom";
+    odom_imu.child_frame_id = "lidar_footprint";
+    odom_robo.header.frame_id = "odom";
+    odom_robo.child_frame_id = "lidar_footprint";
     pub_imu_odom_->publish(odom_imu);
     pub_robo_odom_->publish(odom_robo);
   }
@@ -567,7 +569,8 @@ bool ROSWrapper::sync_measure(MeasureGroup& meas){
 
 void ROSWrapper::pub_odom(const NavState& state){
   nav_msgs::msg::Odometry odom;
-  odom.header.frame_id = "world";
+  odom.header.frame_id = "odom";
+  odom.child_frame_id = "lidar_footprint";
 
   odom.header.stamp = toRosTime(state.timestamp);
   odom.pose.pose.position.x = state.p[0];
@@ -629,7 +632,7 @@ void ROSWrapper::pub_odom(const NavState& state){
   tf_msg.transform.rotation.z = temp_q.z();
   tf_msg.transform.rotation.w = temp_q.w();
 
-  tf_broadcaster_->sendTransform(tf_msg);
+  // tf_broadcaster_->sendTransform(tf_msg);
 
   // tf_msg.child_frame_id = "god";
   // tf_msg.transform.rotation.x = 0.0;

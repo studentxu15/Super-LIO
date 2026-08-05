@@ -7,7 +7,7 @@
     lio.map.ds_size: 0.3
     lio.map.save_interval: 500
 
-    lio.ros.lidar_topic: "/hesai_front/pandar"
+    lio.ros.lidar_topic: "/points_raw"
     lio.ros.imu_topic: "/imu/data"
 
     lio.sensor.lidar_type: 2

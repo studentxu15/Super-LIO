@@ -8,7 +8,7 @@
     lio.map.save_interval: 500
 
     lio.ros.lidar_topic: "/velodyne_points"
-    lio.ros.imu_topic: "/handsfree/imu"
+    lio.ros.imu_topic: "/imu/data"
 
     lio.sensor.lidar_type: 4
     lio.sensor.blind: 2.0
