@@ -8,7 +8,7 @@
     lio.map.save_interval: 500
 
     lio.ros.lidar_topic: "/livox/lidar"
-    lio.ros.imu_topic: "/imu/data"
+    lio.ros.imu_topic: "/imu"
 
     lio.sensor.lidar_type: 1
     lio.sensor.blind: 1.0
@@ -16,7 +16,7 @@
     lio.sensor.filter_rate: 3
     lio.sensor.enable_downsample: true
     lio.sensor.voxel_fliter_size: 0.5
-    lio.sensor.gravity_norm: 1.0
+    lio.sensor.gravity_norm: 9.7946
     lio.sensor.imu_type: 1
     lio.sensor.imu_na: 0.1
     lio.sensor.imu_ng: 0.1
