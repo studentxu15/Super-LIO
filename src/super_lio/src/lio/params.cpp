@@ -23,6 +23,10 @@ namespace LI2Sup{
   
   string g_imu_topic;
   string g_lidar_topic;
+  string g_frame_id = "odom";
+  string g_child_frame_id = "imu";
+  string g_odom_frame_id = "odom";
+  string g_odom_child_frame_id = "lidar_footprint";
 
   int    g_lidar_type;
   float  g_blind2;

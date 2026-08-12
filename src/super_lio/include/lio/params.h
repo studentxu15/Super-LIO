@@ -40,6 +40,10 @@ namespace LI2Sup{
   
   extern std::string g_imu_topic;
   extern std::string g_lidar_topic;
+  extern std::string g_frame_id;
+  extern std::string g_child_frame_id;
+  extern std::string g_odom_frame_id;
+  extern std::string g_odom_child_frame_id;
 
   extern int   g_lidar_type;       // 1: mid360, 2: hesai16, 3: velo16, 4: velo32, 5: vel_nclt, 6: ls16 
   extern float g_blind2;

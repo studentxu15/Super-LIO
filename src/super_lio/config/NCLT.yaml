@@ -9,6 +9,10 @@
 
     lio.ros.lidar_topic: "/points_raw"
     lio.ros.imu_topic: "/imu_raw"
+    lio.ros.frame_id: "odom"
+    lio.ros.child_frame_id: "imu"
+    lio.ros.odom_frame_id: "odom"
+    lio.ros.odom_child_frame_id: "lidar_footprint"
 
     lio.sensor.lidar_type: 5
     lio.sensor.blind: 2.0
