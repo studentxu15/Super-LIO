@@ -71,18 +71,17 @@ ros2 launch super_lio Livox_mid360.py
 
 ```
 
-#### 🔁 Relocalization Mode
-Super-LIO supports relocalization using a pre-built map, allowing the system to resume localization from a saved map without restarting the mapping process.
-This mode is useful for long-term deployment, repeated missions, or recovery after tracking loss.
+#### Relocalization mode
 
-Before running relocalization, please make sure that:
-- A map has been previously saved to disk.
+Use the same sensor configuration and calibrated extrinsics as during mapping:
 
 ```bash
-cd PATH_2_Super-LIO
-source install/setup.bash
-ros2 launch super_lio relocation.py
+ros2 launch super_lio slam.launch.py localization:=true map_path:=/home/USER/road_map/loop_map.pcd
 ```
+
+Automatic localization uses the matching `loop_map.pcd.index` described below.
+No initial position is required. The legacy `relocation_node` is a separate
+initial-guess-based implementation; the new mode uses `super_lio_node`.
 
 
 ## Datasets
@@ -265,3 +264,116 @@ estimate and rejects proposed rotations above 45 degrees. It does not provide
 global registration. Repetitive geometry, low overlap and weakly constrained
 surfaces can still cause missed or incorrect closures; quality checks and a
 robust loss reduce this risk but cannot eliminate it.
+
+## Global map localization (ROS 2)
+
+`localization:=true` enables global place retrieval and continuous scan-to-PCD
+localization. It is mutually exclusive with `loop_closure:=true`. Disabled mode
+does not load a map or index. The IMU/LiDAR frontend continues to build its local
+odometry map; an independent worker uses its deskewed scans and motion prediction
+to match the immutable reference PCD. Accepted matches update `map -> odom`.
+This is a loosely coupled prediction/correction design, not a second EKF that
+assumes the correlated odometry and scan matches are independent.
+
+### Map and index
+
+When loop mapping saves `loop_map.pcd`, it also saves `loop_map.pcd.index` by
+default (`lio.loop.save_place_index: true`). The index stores compact polar
+occupancy/height descriptors and verified keyframe positions in the final map
+coordinates. It follows the polar place-retrieval approach; it is an in-project
+implementation, not the published Scan Context library or a learned model.
+Keep the PCD and index together. An order-independent point fingerprint rejects
+an index paired with a different PCD; do not edit the PCD without rebuilding its
+index.
+
+For an existing PCD without an index, replay its mapping bag once in index-build
+mode. Keyframe scans are registered to that PCD before indexing. This mode writes
+only the index and leaves the reference PCD unchanged:
+
+```bash
+ros2 launch super_lio slam.launch.py loop_closure:=true rviz:=false \
+  index_reference_map:=/home/USER/road_map/loop_map.pcd
+# In another terminal, run the required point-cloud converter and play the mapping bag.
+# After playback and processing finish, Ctrl+C the SLAM node and wait for index saving.
+```
+
+`index_output:=/absolute/path/custom.index` changes the index destination.
+Index generation assumes the mapping trajectory is already in approximately the
+reference map's coordinates; it is not a converter for an unrelated map/bag.
+
+### Start and configure
+
+```bash
+# Default: automatic global search, no manual pose:
+ros2 launch super_lio slam.launch.py localization:=true \
+  map_path:=/home/USER/road_map/loop_map.pcd
+
+# Original LIO with both global backends disabled:
+ros2 launch super_lio slam.launch.py localization:=false loop_closure:=false
+```
+
+`localization_config:=/absolute/path/localization.yaml` selects an overlay; the
+sensor configuration remains selected by `config:=...`. Relevant YAML options:
+
+```yaml
+lio.localization.enabled: false
+lio.localization.map_path: "~/road_map/loop_map.pcd"
+lio.localization.index_path: ""  # Empty selects map_path + ".index".
+lio.localization.use_initial_pose: false
+lio.localization.initial_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+```
+
+Map/index input paths support `~/...`, absolute paths, and paths relative to the
+process working directory. These input paths do not use the special HOME-prefix
+rule of `lio.map.save_map_dir`. `initial_pose` is optional `[x,y,z,roll,pitch,yaw]`
+in meters/degrees for the frontend body in the map frame. RViz `/initialpose`
+messages in the configured map frame can reset localization at runtime; z is
+preserved. A manual prior can also be used without an index, but automatic global
+recovery then requires an index. All configuration parameters are startup-only.
+
+### Quality and failure behavior
+
+The worker retrieves descriptor candidates across the entire indexed trajectory,
+estimates yaw, and refines candidates with GICP against a cropped map. It checks
+Euclidean inlier MSE, overlap, geometric observability, gravity consistency and
+correction size, rejects competing well-separated hypotheses with similar scores,
+and requires consecutive consistent matches before confirming localization.
+Only the latest pending scan is retained, so global search does not create an
+unbounded sensor backlog. Local LIO is not reset or corrected by this worker.
+
+After acquisition, map matching continues at `period` seconds (default 0.5).
+Odometry provides the motion prediction between matches. Short failures report
+`DEGRADED`; `max_failures` consecutive rejects or `max_age` without a valid map
+constraint invalidate global localization. Global odometry and new TF publication
+stop while invalid, local odometry continues, and global search retries. Consumers
+must check `/lio/localization/valid` and odometry freshness; a cached TF is not
+evidence of valid tracking.
+A stationary sensor or paused bag can also trigger the wall-time watchdog.
+
+Important options in `config/localization.yaml` include `voxel_size`,
+`crop_radius`, `period`, `max_mse` (m²), `min_overlap`, `min_eigen_ratio`,
+`max_correction` (m), `max_rotation_deg`, `confirmations`, `max_failures`,
+`max_age`, `global_retry_period`, `global_candidates`, `ambiguity_distance`,
+and `ambiguity_margin`. Startup global verification is stricter than
+routine tracking. Scores and covariance values are not calibrated probabilities;
+odometry covariance is a heuristic indicator and grows with constraint age; it
+is not a statistically calibrated uncertainty estimate.
+Repeated geometry, changed environments and insufficient overlap can prevent
+acquisition; automatic localization does not guarantee a unique place everywhere.
+
+### Outputs and RViz
+
+| Topic / TF | Meaning |
+| --- | --- |
+| `/lio/localization/map` | Immutable reference PCD, PointCloud2, transient-local |
+| `/lio/localization/path` | Accepted map-matching poses, Path, transient-local |
+| `/lio/localization/odom` | Current globally corrected pose while valid |
+| `/lio/localization/status` | SEARCHING / CONFIRMING / TRACKING / DEGRADED / LOST / ERROR and quality details |
+| `/lio/localization/valid` | Machine-readable validity flag, Bool, transient-local |
+| TF `map -> odom` | Last valid global correction, using configured frame names |
+| `/lio/odom`, `/lio/imu/odom` | Existing local frontend outputs |
+
+RViz is configured automatically with Fixed Frame `map`, the reference map,
+localization path and live `/lio/cloud_world`. A missing map-to-odom TF before
+acquisition is expected. Localization launch disables map saving to protect the
+reference map; direct node startup must also set `lio.map.save_map: false`.

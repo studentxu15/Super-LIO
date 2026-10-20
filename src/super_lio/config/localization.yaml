@@ -1,0 +1,28 @@
+# Load after the sensor configuration. Map paths support ~ and absolute paths.
+/**:
+  ros__parameters:
+    lio.localization.enabled: false
+    lio.localization.map_path: "~/road_map/loop_map.pcd"
+    # Empty uses map_path + ".index".
+    lio.localization.index_path: ""
+    lio.localization.map_frame: "map"
+    lio.localization.use_initial_pose: false
+    lio.localization.initial_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    lio.localization.voxel_size: 0.4
+    lio.localization.period: 0.5
+    lio.localization.crop_radius: 30.0
+    lio.localization.gicp_iterations: 40
+    lio.localization.global_retry_period: 5.0
+    lio.localization.max_mse: 0.12
+    lio.localization.min_overlap: 0.7
+    lio.localization.min_eigen_ratio: 0.0001
+    lio.localization.max_correction: 2.0
+    lio.localization.max_rotation_deg: 20.0
+    lio.localization.min_points: 150
+    lio.localization.confirmations: 2
+    lio.localization.global_candidates: 12
+    lio.localization.ambiguity_distance: 1.5
+    lio.localization.ambiguity_margin: 0.015
+    lio.localization.max_failures: 3
+    lio.localization.max_age: 3.0
+    lio.localization.path_limit: 10000

@@ -19,6 +19,7 @@
 #include "params.h"
 #include "ESKF.h"
 #include "loop_closure.h"
+#include "map_localizer.h"
 #include "OctVoxMap/OctVoxMap.hpp"
 #include "OctVoxMap/VoxelGridFilter.h"
 #include "ros/ROSWrapper.h"
@@ -36,7 +37,10 @@ public:
   virtual void init();
   void process();
   void saveMap();
-  void finishLoopClosure() { if (loop_closure_) loop_closure_->finish(); }
+  void finishLoopClosure() {
+    if (loop_closure_) loop_closure_->finish();
+    if (map_localizer_) map_localizer_->finish();
+  }
   void printTimeRecord();
 
 protected:
@@ -63,6 +67,7 @@ protected:
   ROSWrapper::Ptr data_wrapper_;
   // Destroy/join the backend before releasing the ROS node it references.
   std::unique_ptr<LoopClosure> loop_closure_;
+  std::unique_ptr<MapLocalizer> map_localizer_;
   MeasureGroup measures_;
   
   bool flg_init_ = false;

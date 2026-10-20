@@ -83,6 +83,7 @@ void SuperLIO::init(){
   voxel_grid_fliter_.setLeafSize(g_voxel_fliter_size);
 
   loop_closure_ = std::make_unique<LoopClosure>(*data_wrapper_);
+  map_localizer_ = std::make_unique<MapLocalizer>(*data_wrapper_);
   state_fn_ = &SuperLIO::stateWaitKFInit;
 
   LOG(INFO) << GREEN << " ---> [SuperLIO]: initialized." << RESET;
@@ -561,6 +562,7 @@ void SuperLIO::Output(){
   auto state = kf_->GetNavState();
   data_wrapper_->pub_odom(state);
   if (loop_closure_) loop_closure_->submit(state, ds_undistort_);
+  if (map_localizer_) map_localizer_->submit(state, ds_undistort_);
 
   Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
   transformation.block<3, 3>(0, 0) = state.R.R_.cast<float>();

@@ -2,6 +2,10 @@
 /**:
   ros__parameters:
     lio.loop.enabled: false
+    # Save a matching global localization index alongside loop_map.pcd.
+    lio.loop.save_place_index: true
+    lio.loop.place_index_path: ""
+    lio.loop.place_index_reference_map: ""
     lio.loop.keyframe_distance: 1.0
     lio.loop.keyframe_angle_deg: 15.0
     lio.loop.keyframe_max_time: 5.0

@@ -1,10 +1,12 @@
 #include "lio/loop_closure.h"
 #include "lio/loop_pose_graph.h"
 #include "lio/params.h"
+#include "lio/place_index.h"
 #include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
@@ -21,7 +23,8 @@
 namespace LI2Sup {
 namespace {
 using Pose = Eigen::Isometry3d;
-using Cloud = pcl::PointCloud<pcl::PointXYZI>;
+using Point = pcl::PointXYZI;
+using Cloud = pcl::PointCloud<Point>;
 using Descriptor = Eigen::Matrix<double, 20, 60>;
 builtin_interfaces::msg::Time stamp(double t) {
   return rclcpp::Time(static_cast<int64_t>(t * 1e9));
@@ -104,7 +107,9 @@ struct LoopClosure::Impl {
       min_eigen_ratio;
   int submap_frames, max_candidates, queue_limit, iterations, min_points,
       max_keyframes, gicp_neighbors, gicp_optimizer_iterations;
-  std::string map_frame, odom_frame, child_frame;
+  std::string map_frame, odom_frame, child_frame, place_index_path,
+      place_index_reference;
+  bool save_place_index = true;
   struct Frame {
     double time;
     Pose raw, optimized;
@@ -137,6 +142,17 @@ struct LoopClosure::Impl {
     enabled = param("enabled", false);
     if (!enabled)
       return;
+    place_index_path = param<std::string>("place_index_path", "");
+    place_index_reference = param<std::string>("place_index_reference_map", "");
+    save_place_index = param("save_place_index", true);
+    for (auto *path : {&place_index_path, &place_index_reference}) {
+      if (path->rfind("~/", 0) == 0) {
+        const char *home = std::getenv("HOME");
+        if (!home)
+          throw std::invalid_argument("HOME is unset");
+        *path = std::string(home) + path->substr(1);
+      }
+    }
     key_distance = param("keyframe_distance", 1.0);
     key_angle = param("keyframe_angle_deg", 15.0) * M_PI / 180.;
     key_time = param("keyframe_max_time", 5.0);
@@ -550,10 +566,95 @@ struct LoopClosure::Impl {
         process(std::move(frame));
       }
       publish(true);
-      if (g_save_map && !frames.empty()) {
-        std::filesystem::create_directories(g_save_map_dir);
-        pcl::io::savePCDFileBinary(g_save_map_dir + "/loop_map.pcd",
-                                   *globalMap());
+      if (!frames.empty() && (g_save_map || !place_index_path.empty())) {
+        auto final_map = globalMap();
+        if (g_save_map) {
+          std::filesystem::create_directories(g_save_map_dir);
+          if (pcl::io::savePCDFileBinary(g_save_map_dir + "/loop_map.pcd",
+                                         *final_map) != 0)
+            throw std::runtime_error("Failed to save loop map");
+        }
+        if (save_place_index) {
+          std::vector<PlaceEntry> entries;
+          Cloud::Ptr reference;
+          pcl::KdTreeFLANN<Point> reference_tree;
+          if (!place_index_reference.empty()) {
+            reference.reset(new Cloud);
+            if (pcl::io::loadPCDFile<Point>(place_index_reference,
+                                            *reference) != 0)
+              throw std::runtime_error("Cannot load index reference map");
+            reference_tree.setInputCloud(reference);
+          }
+          for (size_t i = 0; i < frames.size(); ++i) {
+            const auto &frame = frames[i];
+            Pose pose = frame.optimized;
+            if (reference) {
+              // Offline index migration for an existing PCD. Do not modify the
+              // PCD.
+              if (i % 3)
+                continue;
+              std::vector<int> indices;
+              std::vector<float> distances;
+              Point center;
+              center.x = pose.translation().x();
+              center.y = pose.translation().y();
+              center.z = pose.translation().z();
+              reference_tree.radiusSearch(center, 35., indices, distances);
+              Cloud::Ptr crop(new Cloud);
+              for (int k : indices)
+                crop->push_back(reference->points[k]);
+              if (crop->size() < 100)
+                continue;
+              pcl::GeneralizedIterativeClosestPoint<Point, Point> g;
+              g.setInputSource(frame.cloud);
+              g.setInputTarget(crop);
+              g.setMaximumIterations(40);
+              g.setMaxCorrespondenceDistance(3.);
+              Cloud unused;
+              g.align(unused, pose.matrix().cast<float>());
+              if (!g.hasConverged() || !g.getFinalTransformation().allFinite())
+                continue;
+              Pose refined = Pose::Identity();
+              refined.matrix() = g.getFinalTransformation().cast<double>();
+              refined.linear() = Eigen::Quaterniond(refined.linear())
+                                     .normalized()
+                                     .toRotationMatrix();
+              int count = 0;
+              double error = 0;
+              std::vector<int> id(1);
+              std::vector<float> dist(1);
+              for (const auto &p : *frame.cloud) {
+                Point q;
+                Eigen::Vector3d v = refined * p.getVector3fMap().cast<double>();
+                q.x = v.x();
+                q.y = v.y();
+                q.z = v.z();
+                if (reference_tree.nearestKSearch(q, 1, id, dist) > 0 &&
+                    dist[0] < .25) {
+                  ++count;
+                  error += dist[0];
+                }
+              }
+              if (count < 100 || double(count) / frame.cloud->size() < .7 ||
+                  error / count > .1 ||
+                  (refined.translation() - pose.translation()).norm() > 6)
+                continue;
+              pose = refined;
+            }
+            entries.push_back(
+                describePlace(*frame.cloud, pose.linear(), pose.translation()));
+          }
+          if (entries.empty())
+            throw std::runtime_error("No verified place entries to save");
+          const std::string file = place_index_path.empty()
+                                       ? g_save_map_dir + "/loop_map.pcd.index"
+                                       : place_index_path;
+          savePlaceIndex(file,
+                         mapFingerprint(reference ? *reference : *final_map),
+                         entries);
+          RCLCPP_INFO(node.get_logger(), "Place index saved: %zu entries to %s",
+                      entries.size(), file.c_str());
+        }
       }
     } catch (const std::exception &e) {
       RCLCPP_ERROR(node.get_logger(),

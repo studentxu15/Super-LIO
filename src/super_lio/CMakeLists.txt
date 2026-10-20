@@ -52,7 +52,7 @@ include_directories(
   ${Glog_INCLUDE_DIRS}
 )
 
-file(GLOB_RECURSE LIO_LIB_SRC "src/lio/*.cpp" "src/ros/*.cpp")
+file(GLOB_RECURSE LIO_LIB_SRC CONFIGURE_DEPENDS "src/lio/*.cpp" "src/ros/*.cpp")
 file(GLOB_RECURSE LIO_LIB_HEADERS "include/lio/*.hpp" "include/lio/*.h")
 
 add_library(lio ${LIO_LIB_SRC} ${LIO_LIB_HEADERS})
