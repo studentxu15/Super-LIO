@@ -18,6 +18,7 @@
 #include "common/timer.h"
 #include "params.h"
 #include "ESKF.h"
+#include "loop_closure.h"
 #include "OctVoxMap/OctVoxMap.hpp"
 #include "OctVoxMap/VoxelGridFilter.h"
 #include "ros/ROSWrapper.h"
@@ -35,6 +36,7 @@ public:
   virtual void init();
   void process();
   void saveMap();
+  void finishLoopClosure() { if (loop_closure_) loop_closure_->finish(); }
   void printTimeRecord();
 
 protected:
@@ -59,6 +61,8 @@ protected:
   OctVoxMapType::Ptr ivox_;
   VoxelGridClosest<BASIC::PointType> voxel_grid_fliter_;
   ROSWrapper::Ptr data_wrapper_;
+  // Destroy/join the backend before releasing the ROS node it references.
+  std::unique_ptr<LoopClosure> loop_closure_;
   MeasureGroup measures_;
   
   bool flg_init_ = false;

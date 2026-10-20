@@ -2,6 +2,7 @@
 #include "lio/super_lio.h"
 
 #include <sys/resource.h>
+#include <filesystem>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 #include <tbb/concurrent_vector.h>
@@ -81,6 +82,7 @@ void SuperLIO::init(){
   effect_knn_idxs_.resize(20000);
   voxel_grid_fliter_.setLeafSize(g_voxel_fliter_size);
 
+  loop_closure_ = std::make_unique<LoopClosure>(*data_wrapper_);
   state_fn_ = &SuperLIO::stateWaitKFInit;
 
   LOG(INFO) << GREEN << " ---> [SuperLIO]: initialized." << RESET;
@@ -236,11 +238,9 @@ void SuperLIO::caceData(){
   static bool rm_PCD_dir = false;
   if(!rm_PCD_dir){
     rm_PCD_dir = true;
-    std::string cmd = "rm -rf " + g_save_map_dir + "/PCD";
-    [[maybe_unused]] int res;
-    res = system(cmd.c_str());
-    cmd = "mkdir -p " + g_save_map_dir + "/PCD";
-    res = system(cmd.c_str());
+    const auto cache_dir = std::filesystem::path(g_save_map_dir) / "PCD";
+    std::filesystem::remove_all(cache_dir);
+    std::filesystem::create_directories(cache_dir);
   }
 
   if (point_map_->size() > 0 && scan_wait_num >= g_pcd_save_interval) {
@@ -559,7 +559,8 @@ void SuperLIO::UpdateMap() {
 
 void SuperLIO::Output(){
   auto state = kf_->GetNavState();
-  data_wrapper_->pub_odom(state);  
+  data_wrapper_->pub_odom(state);
+  if (loop_closure_) loop_closure_->submit(state, ds_undistort_);
 
   Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
   transformation.block<3, 3>(0, 0) = state.R.R_.cast<float>();

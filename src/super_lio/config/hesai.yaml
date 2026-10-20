@@ -50,3 +50,6 @@
     lio.output.pub_step: 10
 
     lio.eva.timer: true
+
+    # Enable via slam.launch.py loop_closure:=true; raw LIO outputs stay continuous.
+    lio.loop.enabled: false

@@ -16,6 +16,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 find_package(rclcpp REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -24,6 +25,7 @@ find_package(nav_msgs REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(livox_ros_driver2 REQUIRED)
 
+find_package(GTSAM 4.2 REQUIRED)
 find_package(Eigen3 REQUIRED NO_MODULE)
 find_package(PCL REQUIRED)
 find_package(Glog REQUIRED)
@@ -57,6 +59,7 @@ add_library(lio ${LIO_LIB_SRC} ${LIO_LIB_HEADERS})
 
 ament_target_dependencies(lio PUBLIC
   rclcpp
+  rcl_interfaces
   std_msgs
   geometry_msgs
   sensor_msgs
@@ -70,6 +73,7 @@ ament_target_dependencies(lio PUBLIC
 
 target_link_libraries(lio PUBLIC
   Eigen3::Eigen
+  gtsam
   ${PCL_LIBRARIES}
   glog
   pthread

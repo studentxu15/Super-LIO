@@ -52,10 +52,12 @@ Ubuntu 24(22).04 · C++20 · ROS Jazzy(Humble) · Eigen · PCL
 
 ### Dependencies
 
-glog · TBB
+glog · TBB · GTSAM >= 4.2
 
 ```bash
 sudo apt install libgoogle-glog-dev libtbb-dev
+# ROS 2 Humble:
+sudo apt install ros-humble-gtsam
 ```
 
 ### Build & Run
@@ -138,3 +140,128 @@ We kindly recommend to cite [our paper](https://ieeexplore.ieee.org/document/113
  - [Important revisions]: Fixed some known errors and improved algorithm accuracy!
  
 </details>
+## Optional loop closure (ROS 2)
+
+Loop closure is **disabled by default**. The mapping node supports a background
+backend using PCL GICP registration and a GTSAM iSAM2 incremental SE(3) pose graph.
+Local ESKF propagation, voxel mapping, and existing `/lio/odom`, `/lio/path`, and
+`/lio/cloud_world` outputs retain their original coordinate frame and behavior.
+The relocalization node does not instantiate this backend. IMU input is still
+required by the LIO frontend.
+
+### Dependencies and build
+
+Requires GTSAM 4.2 or newer in addition to the existing dependencies. GICP is
+provided by PCL. For ROS 2 Humble:
+
+```bash
+sudo apt install ros-humble-gtsam
+colcon build --packages-up-to super_lio
+source install/setup.bash
+```
+
+### Run
+
+```bash
+# Local LIO, loop closure disabled:
+ros2 launch super_lio slam.launch.py loop_closure:=false
+
+# Loop closure enabled with the optimized RViz view:
+ros2 launch super_lio slam.launch.py loop_closure:=true
+
+# Select another sensor configuration:
+ros2 launch super_lio slam.launch.py loop_closure:=true config:=/absolute/path/to/hesai.yaml
+
+# Recorded data, in separate terminals:
+ros2 launch super_lio slam.launch.py loop_closure:=true use_sim_time:=true
+ros2 bag play /path/to/rosbag --clock --delay 2
+```
+
+`config/loop_closure.yaml` is loaded after the sensor configuration. Select a
+custom overlay with `loop_config:=/absolute/path/to/loop_closure.yaml`.
+`loop_closure` overrides `lio.loop.enabled`. These are read-only startup
+parameters: restart the node to change them. Restart SLAM before replaying a bag
+again; timestamp resets are not a new mapping session.
+
+The default Livox configuration subscribes to `/livox/lidar` (`CustomMsg`) and
+`/imu/data`. Pacecat point clouds can use an external `pacecat_repub` converter
+before entering this interface. Preserve per-point acquisition times and set
+LiDAR-to-IMU extrinsics to match the actual installation.
+
+### Backend behavior
+
+Distance, rotation and elapsed time select keyframes. Spatial radius and time
+separation select historical candidates, which are ranked using a yaw-invariant
+polar occupancy descriptor. This descriptor is a local revisit filter, not the
+original Scan Context algorithm or a global place-recognition system.
+
+GICP aligns each candidate current scan to a historical keyframe submap. The
+result must pass Euclidean inlier MSE, forward/reverse overlap, correction bounds,
+and point-to-plane information checks. The acceptance MSE is measured in m²; it
+is not GICP's covariance-weighted internal objective.
+
+Only accepted loops submit pending odometry factors and new keyframe poses to
+iSAM2. Prior incremental structure is retained rather than rebuilding a batch
+solver. The first pose has a tight prior; odometry and robust Huber loop factors
+constrain relative poses. GTSAM Pose3 noise parameters use rotation-first,
+translation-second ordering. A trial solver copy provides rollback if an update
+fails validation. The frontend and its local map are not rewritten by the graph.
+
+A bounded queue and one backend thread keep registration, optimization and map
+reconstruction off the sensor callback. Keyframe clouds are voxel filtered.
+At `max_keyframes`, the backend stops retaining additional keyframes and warns;
+local LIO continues. Memory still grows with retained keyframes, and a large
+loop can require updating a substantial part of the graph.
+
+### Outputs and RViz
+
+| Output | Meaning |
+| --- | --- |
+| `/lio/odom`, `/lio/imu/odom`, `/lio/robo/odom` | Original local estimates |
+| `/lio/loop/odom` | Current pose with global correction applied |
+| `/lio/loop/path` | Entire optimized keyframe trajectory |
+| `/lio/loop/map` | Entire map rebuilt using optimized keyframe poses |
+| `/lio/loop/constraints` | Accepted loop edges, displayed as red lines |
+| TF `loop_map -> <lio.ros.odom_frame_id>` | Global correction of local odometry |
+
+The enabled launch loads `rviz/loop.rviz`. Map, path and markers use reliable
+transient-local QoS. Each map message replaces the complete map; keep map decay
+at zero. A verified loop immediately triggers optimized path/map publication.
+If `map_frame` is changed, change RViz Fixed Frame to match.
+
+When `lio.map.save_map` is true, shutdown drains pending backend keyframes and
+saves an additional downsampled `loop_map.pcd` in the configured map directory.
+Existing local-map saving keeps its original filename and behavior.
+
+`lio.map.save_map_dir` is resolved relative to the current user's `HOME`.
+`/road_map/`, `road_map`, and `~/road_map/` all save under `~/road_map/`.
+The default `map` saves under `~/map/`. A leading slash does not select the
+filesystem root for this parameter.
+The output directory is created automatically when map saving is enabled.
+
+### Parameters
+
+All names below have the prefix `lio.loop.`; see `config/loop_closure.yaml`.
+
+| Parameter | Purpose |
+| --- | --- |
+| `enabled` | Enable the backend at startup; default false |
+| `keyframe_distance`, `keyframe_angle_deg`, `keyframe_max_time` | Keyframe spacing in m, degrees, seconds |
+| `min_time_separation`, `search_radius` | Historical candidate separation in seconds and search radius in m |
+| `voxel_size`, `submap_frames`, `max_candidates` | Registration cloud size, historical submap span, candidate budget |
+| `gicp_iterations` | Maximum GICP outer iterations |
+| `gicp_neighbors` | Neighbor count for local covariance estimation; default 20 |
+| `gicp_optimizer_iterations` | Maximum inner GICP optimizer iterations; default 20 |
+| `max_fitness`, `min_overlap` | Euclidean inlier MSE limit in m² and minimum forward overlap |
+| `max_correction`, `min_eigen_ratio` | Maximum proposed translation correction and geometric degeneracy threshold |
+| `descriptor_threshold` | Candidate occupancy descriptor distance threshold |
+| `map_publish_period` | Normal full-map publication interval in sensor seconds; loops bypass this interval |
+| `queue_limit`, `max_keyframes` | Bounds on pending and retained keyframes |
+| `min_points`, `map_frame` | Minimum cloud size and corrected map frame |
+
+`icp_iterations` is retained as a deprecated fallback only when
+`gicp_iterations` is not supplied. GICP uses the odometry pose as its initial
+estimate and rejects proposed rotations above 45 degrees. It does not provide
+global registration. Repetitive geometry, low overlap and weakly constrained
+surfaces can still cause missed or incorrect closures; quality checks and a
+robust loss reduce this risk but cannot eliminate it.

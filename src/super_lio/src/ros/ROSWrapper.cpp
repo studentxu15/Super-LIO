@@ -1,6 +1,9 @@
 
 #include "ros/ROSWrapper.h"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
+#include <cstdlib>
+#include <filesystem>
+#include <stdexcept>
 
 
 using namespace BASIC;
@@ -23,7 +26,16 @@ void LoadParamFromRos(rclcpp::Node& node)
 
   node.declare_parameter<std::string>("lio.map.save_map_dir", "");
   node.get_parameter("lio.map.save_map_dir", g_save_map_dir);
-  g_save_map_dir = g_root_dir + g_save_map_dir;
+  const char* user_home = std::getenv("HOME");
+  if (!user_home || !*user_home)
+    throw std::runtime_error("Cannot resolve map directory: HOME is unset");
+  if (g_save_map_dir == "~" || g_save_map_dir.rfind("~/", 0) == 0)
+    g_save_map_dir.erase(0, 1);
+  g_save_map_dir = (std::filesystem::path(user_home) /
+                    std::filesystem::path(g_save_map_dir).relative_path()).lexically_normal().string();
+  if (g_save_map)
+    std::filesystem::create_directories(g_save_map_dir);
+  RCLCPP_INFO(node.get_logger(), "Map save directory: %s", g_save_map_dir.c_str());
 
   node.declare_parameter<std::string>("lio.map.map_name", "default");
   node.get_parameter("lio.map.map_name", g_map_name);

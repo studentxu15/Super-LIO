@@ -1,0 +1,25 @@
+# Overlay after the sensor configuration. enabled defaults to false.
+/**:
+  ros__parameters:
+    lio.loop.enabled: false
+    lio.loop.keyframe_distance: 1.0
+    lio.loop.keyframe_angle_deg: 15.0
+    lio.loop.keyframe_max_time: 5.0
+    lio.loop.min_time_separation: 30.0
+    lio.loop.search_radius: 8.0
+    lio.loop.voxel_size: 0.4
+    lio.loop.max_fitness: 0.15
+    lio.loop.min_overlap: 0.65
+    lio.loop.max_correction: 10.0
+    lio.loop.descriptor_threshold: 0.22
+    lio.loop.submap_frames: 5
+    lio.loop.max_candidates: 3
+    lio.loop.queue_limit: 16
+    lio.loop.gicp_iterations: 60
+    lio.loop.gicp_neighbors: 20
+    lio.loop.gicp_optimizer_iterations: 20
+    lio.loop.min_points: 100
+    lio.loop.map_publish_period: 3.0
+    lio.loop.max_keyframes: 2000
+    lio.loop.min_eigen_ratio: 0.0001
+    lio.loop.map_frame: loop_map
