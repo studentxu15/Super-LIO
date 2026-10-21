@@ -41,6 +41,7 @@ namespace LI2Sup{
   extern std::string g_imu_topic;
   extern std::string g_lidar_topic;
   extern std::string g_frame_id;
+  extern std::string g_map_frame_id;
   extern std::string g_child_frame_id;
   extern std::string g_odom_frame_id;
   extern std::string g_odom_child_frame_id;

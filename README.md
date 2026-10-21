@@ -110,7 +110,7 @@ This writes only the index. It assumes the replay trajectory is approximately al
 | `/lio/localization/map` | Reference PCD |
 | `/lio/localization/status`, `/lio/localization/valid` | Tracking state and validity |
 
-RViz Fixed Frame defaults to `odom` for local LIO, `loop_map` for loop mapping and `map` for localization. Global corrections are published as `loop_map → odom` or `map → odom`; local LIO publishes `odom → lidar_footprint`. Map displays use **Reliable / Transient Local**, with decay set to zero.
+Loop mapping and localization share `lio.ros.map_frame_id` (default `map`), configured in the sensor YAML alongside `lio.ros.frame_id: "odom"`. This replaces `lio.loop.map_frame` and `lio.localization.map_frame`; migrate custom configurations to the shared parameter. The global frame must be nonempty and differ from `lio.ros.odom_frame_id`. Global poses, paths, maps, loop markers and correction TF use this frame. Both global RViz configurations default to `map`; when using a custom frame, change RViz Fixed Frame to match. Global corrections are published as `map → odom`; local LIO publishes `odom → lidar_footprint`. Map displays use **Reliable / Transient Local**, with decay set to zero.
 
 ## Citation
 

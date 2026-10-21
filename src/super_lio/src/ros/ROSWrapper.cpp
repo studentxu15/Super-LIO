@@ -55,6 +55,9 @@ void LoadParamFromRos(rclcpp::Node& node)
   node.declare_parameter<std::string>("lio.ros.frame_id", "odom");
   node.get_parameter("lio.ros.frame_id", g_frame_id);
 
+  node.declare_parameter<std::string>("lio.ros.map_frame_id", "map");
+  node.get_parameter("lio.ros.map_frame_id", g_map_frame_id);
+
   node.declare_parameter<std::string>("lio.ros.child_frame_id", "imu");
   node.get_parameter("lio.ros.child_frame_id", g_child_frame_id);
 

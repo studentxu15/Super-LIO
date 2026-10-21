@@ -5,7 +5,6 @@
     lio.localization.map_path: "~/road_map/loop_map.pcd"
     # Empty uses map_path + ".index".
     lio.localization.index_path: ""
-    lio.localization.map_frame: "map"
     lio.localization.use_initial_pose: false
     lio.localization.initial_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     lio.localization.voxel_size: 0.4

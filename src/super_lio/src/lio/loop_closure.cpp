@@ -176,7 +176,7 @@ struct LoopClosure::Impl {
     max_keyframes = param("max_keyframes", 2000);
     min_eigen_ratio = param("min_eigen_ratio", 0.0001);
     map_period = param("map_publish_period", 3.0);
-    map_frame = param<std::string>("map_frame", "loop_map");
+    map_frame = g_map_frame_id;
     odom_frame = g_odom_frame_id;
     child_frame = g_odom_child_frame_id;
     const std::array<double, 13> numeric = {key_distance,

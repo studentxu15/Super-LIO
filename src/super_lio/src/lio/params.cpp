@@ -24,6 +24,7 @@ namespace LI2Sup{
   string g_imu_topic;
   string g_lidar_topic;
   string g_frame_id = "odom";
+  string g_map_frame_id = "map";
   string g_child_frame_id = "imu";
   string g_odom_frame_id = "odom";
   string g_odom_child_frame_id = "lidar_footprint";

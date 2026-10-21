@@ -10,6 +10,8 @@
     lio.ros.lidar_topic: "/points_raw"
     lio.ros.imu_topic: "/imu/data"
     lio.ros.frame_id: "odom"
+    # Shared global frame for loop closure and map localization.
+    lio.ros.map_frame_id: "map"
     lio.ros.child_frame_id: "imu"
     lio.ros.odom_frame_id: "odom"
     lio.ros.odom_child_frame_id: "lidar_footprint"

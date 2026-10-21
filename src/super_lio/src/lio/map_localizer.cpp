@@ -149,7 +149,7 @@ struct MapLocalizer::Impl {
     confirm_count = param("confirmations", 2);
     max_failures = param("max_failures", 3);
     path_limit = param("path_limit", 10000);
-    map_frame = param<std::string>("map_frame", "map");
+    map_frame = g_map_frame_id;
     odom_frame = g_odom_frame_id;
     child_frame = g_odom_child_frame_id;
     manual = param("use_initial_pose", false);

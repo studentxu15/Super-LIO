@@ -26,4 +26,3 @@
     lio.loop.map_publish_period: 3.0
     lio.loop.max_keyframes: 2000
     lio.loop.min_eigen_ratio: 0.0001
-    lio.loop.map_frame: loop_map
